@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>HelmGuard SOS - Live IoT Dashboard</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 16px; }
+    .status-banner { padding: 20px; border-radius: 12px; text-align: center; font-size: 24px; font-weight: bold; margin: 20px 0; transition: 0.3s; }
+    .NORMAL_CONVOY { background: #065f46; color: #a7f3d0; }
+    .BUMPY_ROAD { background: #92400e; color: #fde68a; }
+    .SOS_CRASH_ACTIVE { background: #991b1b; color: #fecaca; animation: blink 1s infinite; }
+    .RESCUE_DISPATCHED { background: #1e40af; color: #bfdbfe; }
+    @keyframes blink { 50% { opacity: 0.6; } }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .card { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; }
+    .metric { font-size: 28px; font-weight: bold; color: #38bdf8; margin: 8px 0; }
+    button { padding: 12px 20px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; margin-right: 10px; }
+    .btn-rescue { background: #2563eb; color: white; }
+    .btn-reset { background: #475569; color: white; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div>
+      <h1 style="margin:0;">🛡️ HelmGuard SOS — Multisensor & 2-Way IoT</h1>
+      <small id="conn-status" style="color: #94a3b8;">Menghubungkan ke HiveMQ Cloud...</small>
+    </div>
+    <div>
+      <button class="btn-rescue" onclick="sendControl('TRIGGER_RESCUE')">🚑 Kirim Sinyal Rescue ke HP A</button>
+      <button class="btn-reset" onclick="sendControl('RESET_SYSTEM')">🔄 Reset Status</button>
+    </div>
+  </div>
+
+  <div id="status-box" class="status-banner NORMAL_CONVOY">STATUS: MENUNGGU DATA...</div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>📱 Edge 1: HP A (Unit Lapangan)</h2>
+      <p>Guncangan (Impact SVM): <div class="metric" id="a-impact">0.0 m/s²</div></p>
+      <p>Kemiringan (Tilt Angle): <div class="metric" id="a-tilt">0.0°</div></p>
+      <p>Intensitas Cahaya (EMA Lux): <div class="metric" id="a-lux">0.0 lux</div></p>
+    </div>
+
+    <div class="card">
+      <h2>📱 Edge 2: HP B (Unit Komandan / Penolong)</h2>
+      <p>Guncangan (Impact SVM): <div class="metric" id="b-impact">0.0 m/s²</div></p>
+      <p>Rotasi Gyroscope: <div class="metric" id="b-gyro">0.0 rad/s</div></p>
+      <p>Gesture Konfirmasi (Shake): <div class="metric" id="b-shake">Tidak</div></p>
+    </div>
+  </div>
+
+  <script>
+    const BASE_TOPIC = "helmguard/kelompok_03";
+    const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
+
+    client.on("connect", () => {
+      document.getElementById("conn-status").innerText = "🟢 Terhubung ke HiveMQ Cloud (WSS Port 8884)";
+      client.subscribe(`${BASE_TOPIC}/dashboard/state`);
+    });
+
+    client.on("message", (topic, message) => {
+      const data = JSON.parse(message.toString());
+      const st = data.system_status;
+      
+      const box = document.getElementById("status-box");
+      box.className = "status-banner " + st;
+      box.innerText = `STATUS KEPUTUSAN AI: ${st} (Update: ${data.updated_at})`;
+
+      document.getElementById("a-impact").innerText = data.hp_a.impact + " m/s²";
+      document.getElementById("a-tilt").innerText = data.hp_a.tilt_deg + "°";
+      document.getElementById("a-lux").innerText = data.hp_a.lux + " lux";
+
+      document.getElementById("b-impact").innerText = data.hp_b.impact + " m/s²";
+      document.getElementById("b-gyro").innerText = data.hp_b.gyro_rate + " rad/s";
+      document.getElementById("b-shake").innerText = data.hp_b.shake_ack ? "✅ YA (Mengirim Bantuan!)" : "Standby";
+    });
+
+    function sendControl(cmd) {
+      client.publish(`${BASE_TOPIC}/dashboard/control`, JSON.stringify({ command: cmd }));
+    }
+  </script>
+</body>
+</html>
