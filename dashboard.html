@@ -143,27 +143,31 @@
     function evaluateAI() {
       const now = Date.now() / 1000;
 
-      // 1. HP B sangat sensitif: Guncangan pelan (impact >= 0.8) langsung mengirim sinyal ke HP A!
-      if (stateB.shake_ack || stateB.impact >= 0.8) {
-        if (now - lastAlertTime > 3) {
+      // 1. Jika HP B diguncang (impact >= 1.8), kirim Rescue 1 KALI lalu langsung reset nilai stateB!
+      if (stateB.shake_ack || stateB.impact >= 1.8) {
+        stateB.shake_ack = false;
+        stateB.impact = 0;
+        if (now - lastAlertTime > 6) {
           triggerRescue();
         }
         return;
       }
 
-      // 2. HP A sensitif tapi tetap aman dari miring biasa: Guncangan sedikit lebih peka (impact >= 2.5) ATAU kombinasi guncang + miring ekstrem (> 60°)
-      if ((stateA.impact >= 1.5 && stateA.tilt_deg > 60.0) || stateA.impact >= 2.5) {
-        if (now - lastAlertTime > 4) {
+      // 2. Jika HP A diguncang (impact >= 2.2), kirim sinyal ke HP B 1 KALI lalu reset nilai impact stateA!
+      if ((stateA.impact >= 1.8 && stateA.tilt_deg > 60.0) || stateA.impact >= 2.2) {
+        const currentImpact = stateA.impact;
+        stateA.impact = 0;
+        if (now - lastAlertTime > 6) {
           systemStatus = "SOS_CRASH_ACTIVE";
           lastAlertTime = now;
           const isDark = stateA.lux < 50.0;
           const alertCode = isDark ? "SOS_NIGHT_CRASH" : "SOS_DAY_CRASH";
 
-          addLog(`🚨 GUNCANGAN HP A TERDETEKSI (Impact: ${stateA.impact})! Mengirim sinyal ke HP B...`);
+          addLog(`🚨 GUNCANGAN HP A TERDETEKSI (Impact: ${currentImpact})! Mengirim sinyal ke HP B...`);
 
           publishAll("edge_b/command", {
             alert: alertCode,
-            message: `Guncangan darurat! Impact: ${stateA.impact}, Miring: ${stateA.tilt_deg}°`
+            message: `Guncangan darurat! Impact: ${currentImpact}, Miring: ${stateA.tilt_deg}°`
           });
           publishAll("edge_a/command", {
             action: "WARNING_CRASH_DETECTED"
@@ -171,6 +175,12 @@
         }
         updateBanner();
         return;
+      }
+
+      // Kembali ke NORMAL_CONVOY setelah 6 detik tenang
+      if (now - lastAlertTime > 6 && systemStatus !== "NORMAL_CONVOY") {
+        systemStatus = "NORMAL_CONVOY";
+        updateBanner();
       }
 
       // Jika tenang setelah 5 detik, kembali ke NORMAL_CONVOY

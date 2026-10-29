@@ -53,7 +53,7 @@ def read_and_process(accel_name, gyro_name):
     impact_score = round(max_impact, 2)
     gyro_rate = round(max_gyro if gyro_name else (impact_score / 1.5), 2)
 
-    is_shaken = (impact_score >= 0.8) or (gyro_rate >= 1.0)
+    is_shaken = (impact_score >= 1.8) or (gyro_rate >= 1.8)
 
     return {
         "device": "HP_B",
@@ -120,10 +120,10 @@ def main():
                 client.publish(TOPIC_COMMAND_A, json.dumps({
                     "action": "RESCUE_ON_THE_WAY",
                     "is_dark": True
-                }), qos=1)
+                }), qos=0)
+                time.sleep(4.0)  # Jeda 4 detik setelah guncangan agar tidak spam sinyal!
             else:
                 print(f"[STANDBY] Impact B: {telemetry['impact']} m/s2 (Guncang HP untuk kirim sinyal)")
-            time.sleep(0.5)
     except KeyboardInterrupt:
         client.loop_stop()
 
