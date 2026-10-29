@@ -11,8 +11,6 @@ if sys.stderr and hasattr(sys.stderr, "reconfigure"):
 # ==========================================
 # KONFIGURASI MQTT BROKER & TOPIC
 # ==========================================
-# Gunakan broker.emqx.io port 1883 (TCP publik tanpa SSL)
-# Sesuai dengan edge_hp_a dan edge_hp_b agar berada di broker yang sama!
 BROKER = "broker.emqx.io"
 PORT = 1883
 
@@ -36,11 +34,6 @@ state_b = {
     "timestamp": time.time()
 }
 
-# Status Sistem:
-# NORMAL_CONVOY    : Kondisi normal perjalanan
-# BUMPY_ROAD       : Jalan bergelombang/polisi tidur (Sensor Fusion: HP A & B terguncang bersama)
-# SOS_CRASH_ACTIVE : HP A mengalami benturan/kemiringan ekstrem sendirian (Kecelakaan)
-# RESCUE_DISPATCHED: HP B membalas dengan gesture shake (Bantuan dalam perjalanan)
 system_status = "NORMAL_CONVOY"
 last_alert_time = 0
 last_disturbed_a = 0
@@ -48,7 +41,7 @@ last_disturbed_b = 0
 bumpy_until = 0
 
 def publish_command(client, topic_suffix, payload_dict):
-    """Kirim perintah ke kedua variasi topic (kelompok03 & kelompok_03) untuk kompatibilitas penuh"""
+    """Kirim perintah ke kedua variasi topic untuk kompatibilitas penuh"""
     msg = json.dumps(payload_dict)
     client.publish(f"{BASE_TOPIC}/{topic_suffix}", msg, qos=1)
     client.publish(f"{ALT_BASE_TOPIC}/{topic_suffix}", msg, qos=1)
@@ -56,8 +49,8 @@ def publish_command(client, topic_suffix, payload_dict):
 def evaluate_decision_tree(client):
     """
     ALGORITMA AI / DECISION TREE & SENSOR FUSION ANTAR 2 EDGE DEVICE
-    1. Filter False Alarm (Jalan Berlubang / Polisi Tidur via Sensor Fusion)
-    2. Deteksi Crash Solo HP A (Miring > 55 deg atau Benturan Keras)
+    1. Filter False Alarm (Polisi Tidur / Jalan Rusak via Sensor Fusion)
+    2. Deteksi Crash Nyata HP A (Benturan Keras + Miring, BUKAN sekadar dimiringkan pelan)
     3. Komunikasi 2 Arah: Menunggu Shake ACK dari HP B untuk dispatching rescue
     4. Auto-Recovery jika HP A ditegakkan kembali
     """
@@ -82,8 +75,8 @@ def evaluate_decision_tree(client):
 
         if state_b["shake_ack"]:
             system_status = "RESCUE_DISPATCHED"
-            is_dark = state_a["lux"] < 50.0
-            kondisi = "Malam/Gelap (Senter SOS Aktif)" if is_dark else "Siang/Terang"
+            is_dark = state_a["lux"] < 150.0  # Di dalam ruangan/malam hari < 150 lux
+            kondisi = "Kondisi Minim Cahaya (Senter SOS Morse Aktif)" if is_dark else "Kondisi Terang"
             print(f">>> [KEPUTUSAN AI] 🚑 HP B merespons ({kondisi})! Mengirim instruksi RESCUE ke HP A...")
 
             # Kirim perintah konfirmasi penyelamatan ke HP A
@@ -112,21 +105,29 @@ def evaluate_decision_tree(client):
         bumpy_until = now + 3.0
         if system_status != "BUMPY_ROAD":
             system_status = "BUMPY_ROAD"
-            print(">>> [SENSOR FUSION] Kedua HP terguncang bersamaan -> BUMPY_ROAD (Polisi Tidur/Jalan Rusak - Alarm Diabaikan)")
+            print(">>> [SENSOR FUSION] Kedua HP terguncang bersamaan -> BUMPY_ROAD (Polisi Tidur - Alarm Ditekan)")
         return
 
-    # Jika sedang dalam durasi penahanan BUMPY_ROAD, jangan picu alarm kecelakaan
     if now < bumpy_until:
         system_status = "BUMPY_ROAD"
         return
 
-    # 4. DETEKSI KECELAKAAN HP A (HP A miring ekstrem > 55° ATAU benturan keras sendirian)
-    a_crashed = (state_a["tilt_deg"] > 55.0 or state_a["impact"] > 4.0)
+    # 4. DETEKSI KECELAKAAN HP A YANG AKURAT (Bukan sekadar miring pelan di tangan!)
+    # Syarat kecelakaan nyata:
+    # a. Benturan keras (impact >= 2.5 m/s²) DISERTAI posisi helm/HP miring (tilt > 50°)
+    # b. ATAU benturan tabrakan sangat keras (impact >= 5.0 m/s²)
+    # c. ATAU posisi rebah total (tilt > 70°) dengan ada gerakan impact dinamis (>= 1.2 m/s²)
+    crash_impact_tilt = (state_a["impact"] >= 2.5 and state_a["tilt_deg"] > 50.0)
+    crash_hard_impact = (state_a["impact"] >= 5.0)
+    crash_severe_tilt = (state_a["tilt_deg"] > 70.0 and state_a["impact"] >= 1.2)
+
+    a_crashed = crash_impact_tilt or crash_hard_impact or crash_severe_tilt
+
     if a_crashed:
-        if now - last_alert_time > 5:
+        if now - last_alert_time > 4:
             system_status = "SOS_CRASH_ACTIVE"
             last_alert_time = now
-            is_dark = state_a["lux"] < 50.0
+            is_dark = state_a["lux"] < 150.0
             kondisi_cahaya = "Malam/Gelap" if is_dark else "Siang/Terang"
             alert_code = "SOS_NIGHT_CRASH" if is_dark else "SOS_DAY_CRASH"
 
@@ -136,17 +137,17 @@ def evaluate_decision_tree(client):
             # Kirim peringatan darurat ke HP B (Arah 1)
             publish_command(client, "edge_b/command", {
                 "alert": alert_code,
-                "message": f"Unit A terjatuh (Kemiringan {state_a['tilt_deg']}°, {kondisi_cahaya})!"
+                "message": f"Unit A terjatuh (Kemiringan {state_a['tilt_deg']}°, Impact {state_a['impact']} m/s²)!"
             })
-            # Beri tahu HP A bahwa sinyal SOS sudah dikirim ke Cloud
+            # Beri tahu HP A bahwa benturan darurat terdeteksi (nyalakan suara & strobo)
             publish_command(client, "edge_a/command", {
-                "action": "WARNING_CRASH_DETECTED"
+                "action": "WARNING_CRASH_DETECTED",
+                "is_dark": is_dark
             })
     else:
         system_status = "NORMAL_CONVOY"
 
 def publish_dashboard_state(client):
-    """Kirim rangkuman status sistem ke Dashboard Web secara real-time"""
     summary = {
         "system_status": system_status,
         "hp_a": state_a,
@@ -158,7 +159,6 @@ def publish_dashboard_state(client):
 def on_connect(client, userdata, flags, rc, properties=None):
     if rc == 0:
         print(f"✅ [SERVER AI] Terhubung ke Broker {BROKER}:{PORT}")
-        # Subscribe ke kedua kemungkinan nama topik
         topics = [
             ("helmguard/kelompok03/edge_a/telemetry", 1),
             ("helmguard/kelompok03/edge_b/telemetry", 1),
