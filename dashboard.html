@@ -2,183 +2,39 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HelmGuard SOS - Live IoT Multisensor & AI Dashboard</title>
+  <title>HelmGuard SOS - Live IoT Dashboard</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
-    :root {
-      --bg: #0b1120;
-      --card-bg: #1e293b;
-      --border: #334155;
-      --text: #f8fafc;
-      --accent: #38bdf8;
-      --success: #10b981;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --rescue: #3b82f6;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      margin: 0;
-      padding: 24px;
-    }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 16px;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .btn-group {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    button {
-      padding: 10px 16px;
-      font-size: 14px;
-      font-weight: 600;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: opacity 0.2s, transform 0.1s;
-    }
-    button:hover { opacity: 0.9; }
-    button:active { transform: scale(0.98); }
-    .btn-rescue { background: var(--rescue); color: white; }
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+    .config-bar { background: #1e293b; padding: 12px 16px; border-radius: 8px; margin-top: 16px; display: flex; gap: 12px; align-items: center; border: 1px solid #334155; }
+    input { padding: 8px 12px; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: white; font-size: 14px; width: 220px; }
+    .status-banner { padding: 20px; border-radius: 12px; text-align: center; font-size: 24px; font-weight: bold; margin: 20px 0; transition: 0.3s; }
+    .NORMAL_CONVOY { background: #065f46; color: #a7f3d0; }
+    .BUMPY_ROAD { background: #92400e; color: #fde68a; }
+    .SOS_CRASH_ACTIVE { background: #991b1b; color: #fecaca; animation: blink 1s infinite; }
+    .RESCUE_DISPATCHED { background: #1e40af; color: #bfdbfe; }
+    @keyframes blink { 50% { opacity: 0.6; } }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .card { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; }
+    .metric { font-size: 28px; font-weight: bold; color: #38bdf8; margin: 8px 0; }
+    button { padding: 10px 18px; font-size: 15px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; }
+    .btn-rescue { background: #2563eb; color: white; }
     .btn-reset { background: #475569; color: white; }
-    .btn-test { background: #dc2626; color: white; }
-    .btn-topic { background: var(--success); color: white; }
-
-    .config-bar {
-      background: var(--card-bg);
-      padding: 12px 16px;
-      border-radius: 8px;
-      margin-top: 16px;
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      border: 1px solid var(--border);
-      flex-wrap: wrap;
-    }
-    input {
-      padding: 8px 12px;
-      border-radius: 6px;
-      border: 1px solid #475569;
-      background: #0f172a;
-      color: white;
-      font-size: 14px;
-      width: 220px;
-    }
-
-    .status-banner {
-      padding: 18px 24px;
-      border-radius: 12px;
-      text-align: center;
-      font-size: 22px;
-      font-weight: 700;
-      margin: 20px 0;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-    }
-    .NORMAL_CONVOY { background: #064e3b; color: #a7f3d0; border: 1px solid #059669; }
-    .BUMPY_ROAD { background: #78350f; color: #fde68a; border: 1px solid #d97706; }
-    .SOS_CRASH_ACTIVE { background: #7f1d1d; color: #fecaca; border: 1px solid #dc2626; animation: pulse 1s infinite; }
-    .RESCUE_DISPATCHED { background: #1e3a8a; color: #bfdbfe; border: 1px solid #2563eb; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 50% { opacity: 0.7; } }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-    @media (max-width: 840px) {
-      .grid { grid-template-columns: 1fr; }
-    }
-    .card {
-      background: var(--card-bg);
-      padding: 20px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-    }
-    .card-title {
-      font-size: 18px;
-      font-weight: 700;
-      margin-top: 0;
-      margin-bottom: 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .badge {
-      font-size: 11px;
-      padding: 3px 8px;
-      border-radius: 6px;
-      font-weight: 600;
-    }
-    .badge-online { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
-    .badge-ai { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
-
-    .stat-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      padding: 8px 0;
-      border-bottom: 1px solid #283548;
-    }
-    .stat-label { color: #94a3b8; font-size: 14px; }
-    .stat-val { font-size: 24px; font-weight: 700; color: var(--accent); }
-
-    .chart-container {
-      background: var(--card-bg);
-      margin-top: 20px;
-      padding: 16px 20px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-    }
-    canvas {
-      width: 100%;
-      height: 140px;
-      display: block;
-    }
-
-    .log-box {
-      margin-top: 20px;
-      background: #020617;
-      padding: 14px;
-      border-radius: 8px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 13px;
-      color: #94a3b8;
-      max-height: 160px;
-      overflow-y: auto;
-      border: 1px solid var(--border);
-    }
-    .log-item { margin-bottom: 4px; }
-    .log-alert { color: #f87171; font-weight: 600; }
-    .log-rescue { color: #60a5fa; font-weight: 600; }
-    .log-fusion { color: #fbbf24; font-weight: 600; }
+    .btn-topic { background: #10b981; color: white; }
+    .log-box { margin-top: 20px; background: #020617; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 13px; color: #94a3b8; max-height: 140px; overflow-y: auto; border: 1px solid #1e293b; }
   </style>
 </head>
 <body>
 
   <div class="header">
     <div>
-      <h1 style="margin:0; font-size: 24px;">🛡️ HelmGuard SOS — Multisensor & 2-Way IoT</h1>
+      <h1 style="margin:0;">🛡️ HelmGuard SOS — Multisensor & 2-Way IoT</h1>
       <small id="conn-status" style="color: #fbbf24;">Menghubungkan ke Multi-Broker Cloud (EMQX & HiveMQ)...</small>
     </div>
-    <div class="btn-group">
+    <div>
       <button class="btn-rescue" onclick="triggerRescue()">🚑 Kirim Sinyal Rescue ke HP A</button>
       <button class="btn-reset" onclick="resetSystem()">🔄 Reset Status</button>
-      <button class="btn-test" onclick="simulateCrash()">⚠️ Simulasi Crash HP A</button>
     </div>
   </div>
 
@@ -186,102 +42,50 @@
     <label><b>Base Topic MQTT:</b></label>
     <input type="text" id="topic-input" value="helmguard/kelompok03">
     <button class="btn-topic" onclick="changeTopic()">Terapkan Topic</button>
-    <span id="ai-engine-badge" class="badge badge-ai">🤖 AI Engine: Client Standby</span>
-    <small style="color:#94a3b8; margin-left: auto;">(Auto-listen <code>kelompok03</code> & <code>kelompok_03</code>)</small>
+    <small style="color:#94a3b8;">(Otomatis mendengarkan <code>kelompok03</code> dan <code>kelompok_03</code>)</small>
   </div>
 
-  <div id="status-box" class="status-banner NORMAL_CONVOY">
-    <span>🛡️ STATUS SISTEM: NORMAL_CONVOY (Siap Melindungi)</span>
-  </div>
+  <div id="status-box" class="status-banner NORMAL_CONVOY">STATUS: MENUNGGU DATA DARI HP...</div>
 
   <div class="grid">
     <div class="card">
-      <div class="card-title">
-        <span>📱 Edge 1: HP A (Unit Korban / Pelindung Helm)</span>
-        <span class="badge badge-online" id="a-status-badge">Standby</span>
-      </div>
-      <div class="stat-row">
-        <span class="stat-label">Guncangan (Impact SVM):</span>
-        <span class="stat-val" id="a-impact">0.0 <small style="font-size:14px;">m/s²</small></span>
-      </div>
-      <div class="stat-row">
-        <span class="stat-label">Sudut Kemiringan (Tilt):</span>
-        <span class="stat-val" id="a-tilt">0.0 <small style="font-size:14px;">°</small></span>
-      </div>
-      <div class="stat-row">
-        <span class="stat-label">Intensitas Cahaya (EMA Lux):</span>
-        <span class="stat-val" id="a-lux">100 <small style="font-size:14px;">lux</small></span>
-      </div>
-      <small id="a-time" style="color:#94a3b8; display:block; margin-top:8px;">Menunggu data telemetri...</small>
+      <h2>📱 Edge 1: HP A (Unit Lapangan)</h2>
+      <p>Guncangan (Impact SVM): <div class="metric" id="a-impact">0.0 m/s²</div></p>
+      <p>Kemiringan (Tilt Angle): <div class="metric" id="a-tilt">0.0°</div></p>
+      <p>Intensitas Cahaya (EMA Lux): <div class="metric" id="a-lux">0.0 lux</div></p>
+      <small id="a-time" style="color:#94a3b8;">Belum ada pesan masuk</small>
     </div>
 
     <div class="card">
-      <div class="card-title">
-        <span>📱 Edge 2: HP B (Unit Penolong / Rekan Konvoi)</span>
-        <span class="badge badge-online" id="b-status-badge">Standby</span>
-      </div>
-      <div class="stat-row">
-        <span class="stat-label">Guncangan (Impact SVM):</span>
-        <span class="stat-val" id="b-impact">0.0 <small style="font-size:14px;">m/s²</small></span>
-      </div>
-      <div class="stat-row">
-        <span class="stat-label">Rotasi Gyroscope:</span>
-        <span class="stat-val" id="b-gyro">0.0 <small style="font-size:14px;">rad/s</small></span>
-      </div>
-      <div class="stat-row">
-        <span class="stat-label">Gesture Konfirmasi (Shake ACK):</span>
-        <span class="stat-val" id="b-shake" style="color:#94a3b8; font-size:18px;">Standby</span>
-      </div>
-      <small id="b-time" style="color:#94a3b8; display:block; margin-top:8px;">Menunggu data telemetri...</small>
+      <h2>📱 Edge 2: HP B (Unit Komandan / Penolong)</h2>
+      <p>Guncangan (Impact SVM): <div class="metric" id="b-impact">0.0 m/s²</div></p>
+      <p>Rotasi Gyroscope: <div class="metric" id="b-gyro">0.0 rad/s</div></p>
+      <p>Gesture Konfirmasi (Shake): <div class="metric" id="b-shake">Standby</div></p>
+      <small id="b-time" style="color:#94a3b8;">Belum ada pesan masuk</small>
     </div>
   </div>
 
-  <div class="chart-container">
-    <div style="display:flex; justify-content:space-between; margin-bottom: 8px;">
-      <b style="font-size:14px;">📈 Grafik Real-Time: Guncangan Impact (m/s²)</b>
-      <div style="font-size:12px; color:#94a3b8;">
-        <span style="color:#38bdf8;">■ HP A (Korban)</span> &nbsp;&nbsp;
-        <span style="color:#f43f5e;">■ HP B (Penolong)</span> &nbsp;&nbsp;
-        <span style="color:#eab308; border-bottom: 1px dashed #eab308;">--- Ambang Bahaya (4.0)</span>
-      </div>
-    </div>
-    <canvas id="chartCanvas" width="900" height="140"></canvas>
-  </div>
-
-  <div class="log-box" id="log-box">
-    <div class="log-item">[LOG SYSTEM] Menghubungkan ke broker.emqx.io dan broker.hivemq.com via WebSocket...</div>
-  </div>
+  <div class="log-box" id="log-box">[LOG] Menghubungkan ke broker.emqx.io dan broker.hivemq.com...</div>
 
   <script>
     let BASE_TOPIC = document.getElementById("topic-input").value.trim();
 
-    // Koneksi ganda via WebSocket WSS
     const clientEmqx = mqtt.connect("wss://broker.emqx.io:8084/mqtt");
     const clientHive = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
     const clients = [
-      { name: "EMQX WSS", instance: clientEmqx },
-      { name: "HiveMQ WSS", instance: clientHive }
+      { name: "EMQX Cloud", instance: clientEmqx },
+      { name: "HiveMQ Cloud", instance: clientHive }
     ];
 
-    let stateA = { impact: 0, tilt_deg: 0, gyro_rate: 0, lux: 100, timestamp: 0 };
-    let stateB = { impact: 0, gyro_rate: 0, shake_ack: false, timestamp: 0 };
+    let stateA = { impact: 0, tilt_deg: 0, gyro_rate: 0, lux: 100 };
+    let stateB = { impact: 0, gyro_rate: 0, shake_ack: false };
     let systemStatus = "NORMAL_CONVOY";
     let lastAlertTime = 0;
-    let lastServerStateTime = 0;
-    let bumpyUntil = 0;
 
-    const MAX_POINTS = 60;
-    const historyA = new Array(MAX_POINTS).fill(0);
-    const historyB = new Array(MAX_POINTS).fill(0);
-
-    function addLog(msg, typeClass = "") {
+    function addLog(msg) {
       const box = document.getElementById("log-box");
       const time = new Date().toLocaleTimeString();
-      const div = document.createElement("div");
-      div.className = "log-item " + typeClass;
-      div.innerHTML = `[${time}] ${msg}`;
-      box.insertBefore(div, box.firstChild);
-      if (box.childNodes.length > 50) box.removeChild(box.lastChild);
+      box.innerHTML = `[${time}] ${msg}<br>` + box.innerHTML;
     }
 
     function publishAll(topicSuffix, payloadObj) {
@@ -297,59 +101,33 @@
 
     clients.forEach(c => {
       c.instance.on("connect", () => {
-        document.getElementById("conn-status").innerText = "🟢 Terhubung ke Cloud MQTT (EMQX & HiveMQ Aktif)";
+        document.getElementById("conn-status").innerText = "🟢 Terhubung ke Cloud (EMQX & HiveMQ Aktif)";
         document.getElementById("conn-status").style.color = "#4ade80";
         c.instance.subscribe("helmguard/#");
-        addLog(`✅ Terhubung ke ${c.name} - Mendengarkan semua topik di helmguard/#`);
+        addLog(`✅ Terhubung ke ${c.name}! Mendengarkan semua topik di helmguard/#`);
       });
 
       c.instance.on("message", (topic, message) => {
         try {
           const data = JSON.parse(message.toString());
-          const nowStr = `Terakhir: ` + new Date().toLocaleTimeString();
+          const nowStr = `Terakhir masuk (${c.name}): ` + new Date().toLocaleTimeString();
 
-          // 1. Menerima State Resmi dari Server AI Laptop
-          if (topic.endsWith("dashboard/state")) {
-            lastServerStateTime = Date.now();
-            document.getElementById("ai-engine-badge").innerText = "🤖 Server AI Mode: Active (Laptop)";
-            document.getElementById("ai-engine-badge").className = "badge badge-online";
-
-            if (data.system_status) {
-              systemStatus = data.system_status;
-              updateBanner();
-            }
-            if (data.hp_a) updateHP_A(data.hp_a, nowStr);
-            if (data.hp_b) updateHP_B(data.hp_b, nowStr);
-            return;
-          }
-
-          // 2. Menerima Telemetri HP A
-          if (topic.endsWith("edge_a/telemetry")) {
+          if (data.device === "HP_A" || topic.includes("edge_a/telemetry")) {
             stateA = data;
-            updateHP_A(data, nowStr);
-            historyA.push(data.impact || 0);
-            historyA.shift();
-            drawChart();
-
-            // Jalankan AI client jika Server AI Laptop tidak aktif
-            if (Date.now() - lastServerStateTime > 4000) {
-              document.getElementById("ai-engine-badge").innerText = "⚡ Edge Standalone Mode (Web Fallback)";
-              document.getElementById("ai-engine-badge").className = "badge badge-ai";
-              evaluateClientAI();
-            }
-          }
-
-          // 3. Menerima Telemetri HP B
-          else if (topic.endsWith("edge_b/telemetry")) {
+            document.getElementById("a-impact").innerText = (data.impact ?? 0) + " m/s²";
+            document.getElementById("a-tilt").innerText = (data.tilt_deg ?? 0) + "°";
+            document.getElementById("a-lux").innerText = (data.lux ?? 0) + " lux";
+            document.getElementById("a-time").innerText = nowStr;
+            addLog(`📥 [${c.name}] Data HP A -> Impact: ${data.impact}, Tilt: ${data.tilt_deg}°, Lux: ${data.lux}`);
+            evaluateAI();
+          } else if (data.device === "HP_B" || topic.includes("edge_b/telemetry")) {
             stateB = data;
-            updateHP_B(data, nowStr);
-            historyB.push(data.impact || 0);
-            historyB.shift();
-            drawChart();
-
-            if (Date.now() - lastServerStateTime > 4000) {
-              evaluateClientAI();
-            }
+            document.getElementById("b-impact").innerText = (data.impact ?? 0) + " m/s²";
+            document.getElementById("b-gyro").innerText = (data.gyro_rate ?? 0) + " rad/s";
+            document.getElementById("b-shake").innerText = data.shake_ack ? "✅ YA (Mengirim Bantuan!)" : "Standby";
+            document.getElementById("b-time").innerText = nowStr;
+            addLog(`📥 [${c.name}] Data HP B -> Impact: ${data.impact}, Shake ACK: ${data.shake_ack}`);
+            evaluateAI();
           }
         } catch (e) {
           console.error(e);
@@ -357,103 +135,46 @@
       });
     });
 
-    function updateHP_A(data, timeStr) {
-      document.getElementById("a-impact").innerHTML = (data.impact || 0) + ` <small style="font-size:14px;">m/s²</small>`;
-      document.getElementById("a-tilt").innerHTML = (data.tilt_deg || 0) + ` <small style="font-size:14px;">°</small>`;
-      document.getElementById("a-lux").innerHTML = (data.lux || 0) + ` <small style="font-size:14px;">lux</small>`;
-      document.getElementById("a-time").innerText = timeStr;
-      document.getElementById("a-status-badge").innerText = "Online";
-    }
-
-    function updateHP_B(data, timeStr) {
-      document.getElementById("b-impact").innerHTML = (data.impact || 0) + ` <small style="font-size:14px;">m/s²</small>`;
-      document.getElementById("b-gyro").innerHTML = (data.gyro_rate || 0) + ` <small style="font-size:14px;">rad/s</small>`;
-      const shakeEl = document.getElementById("b-shake");
-      if (data.shake_ack) {
-        shakeEl.innerHTML = `<span style="color:#34d399; font-weight:bold;">✅ YA (Shake Bantuan!)</span>`;
-      } else {
-        shakeEl.innerText = "Standby";
-        shakeEl.style.color = "#94a3b8";
-      }
-      document.getElementById("b-time").innerText = timeStr;
-      document.getElementById("b-status-badge").innerText = "Online";
-    }
-
     function changeTopic() {
       BASE_TOPIC = document.getElementById("topic-input").value.trim();
       addLog(`Topic aktif disetel ke: ${BASE_TOPIC}`);
     }
 
-    // AI DECISION TREE STANDALONE CLIENT (Digunakan jika server_ai.py tidak aktif)
-    function evaluateClientAI() {
+    function evaluateAI() {
       const now = Date.now() / 1000;
 
-      // 1. Jika dalam status SOS_CRASH_ACTIVE, cek konfirmasi bantuan dari HP B
-      if (systemStatus === "SOS_CRASH_ACTIVE") {
-        if (stateB.shake_ack || stateB.impact >= 3.5) {
+      // 1. HP B sangat sensitif: Guncangan pelan (impact >= 0.8) langsung mengirim sinyal ke HP A!
+      if (stateB.shake_ack || stateB.impact >= 0.8) {
+        if (now - lastAlertTime > 3) {
           triggerRescue();
         }
         return;
       }
 
-      if (systemStatus === "RESCUE_DISPATCHED") {
-        if (stateA.tilt_deg < 35.0 && stateA.impact < 1.5) {
-          systemStatus = "NORMAL_CONVOY";
-          updateBanner();
-          addLog("HP A ditegakkan kembali. Status normal.", "log-rescue");
-        }
-        return;
-      }
-
-      // 2. Sensor Fusion: Deteksi Polisi Tidur (Kedua HP terguncang bersamaan)
-      const aDisturbed = (stateA.impact > 2.5 || stateA.gyro_rate > 1.8);
-      const bDisturbed = (stateB.impact > 2.5 || stateB.gyro_rate > 1.8);
-
-      if (aDisturbed && bDisturbed) {
-        bumpyUntil = now + 3;
-        if (systemStatus !== "BUMPY_ROAD") {
-          systemStatus = "BUMPY_ROAD";
-          updateBanner();
-          addLog("🛣️ [SENSOR FUSION] Kedua HP terguncang bersama -> BUMPY_ROAD (False Alarm Dicegah)", "log-fusion");
-        }
-        return;
-      }
-
-      if (now < bumpyUntil) {
-        systemStatus = "BUMPY_ROAD";
-        updateBanner();
-        return;
-      }
-
-      // 3. Deteksi Crash Nyata HP A (Bukan sekadar dimiringkan pelan)
-      const crashImpactTilt = (stateA.impact >= 2.5 && stateA.tilt_deg > 50.0);
-      const crashHardImpact = (stateA.impact >= 5.0);
-      const crashSevereTilt = (stateA.tilt_deg > 70.0 && stateA.impact >= 1.2);
-
-      if ((crashImpactTilt || crashHardImpact || crashSevereTilt) && !bDisturbed) {
+      // 2. HP A sensitif tapi tetap aman dari miring biasa: Guncangan sedikit lebih peka (impact >= 2.5) ATAU kombinasi guncang + miring ekstrem (> 60°)
+      if ((stateA.impact >= 1.5 && stateA.tilt_deg > 60.0) || stateA.impact >= 2.5) {
         if (now - lastAlertTime > 4) {
           systemStatus = "SOS_CRASH_ACTIVE";
           lastAlertTime = now;
-          const isDark = (stateA.lux || 100) < 150;
+          const isDark = stateA.lux < 50.0;
           const alertCode = isDark ? "SOS_NIGHT_CRASH" : "SOS_DAY_CRASH";
 
-          addLog(`🚨 BAHAYA! ${alertCode} pada HP A (Miring: ${stateA.tilt_deg}°, Impact: ${stateA.impact} m/s²)!`, "log-alert");
+          addLog(`🚨 GUNCANGAN HP A TERDETEKSI (Impact: ${stateA.impact})! Mengirim sinyal ke HP B...`);
 
           publishAll("edge_b/command", {
             alert: alertCode,
-            message: `Unit A terjatuh! Kemiringan: ${stateA.tilt_deg}°, Impact: ${stateA.impact} m/s²`
+            message: `Guncangan darurat! Impact: ${stateA.impact}, Miring: ${stateA.tilt_deg}°`
           });
           publishAll("edge_a/command", {
-            action: "WARNING_CRASH_DETECTED",
-            is_dark: isDark
+            action: "WARNING_CRASH_DETECTED"
           });
         }
         updateBanner();
         return;
       }
 
-      // Kembali ke NORMAL jika kondisi tenang
-      if (now - lastAlertTime > 5 && systemStatus !== "NORMAL_CONVOY") {
+      // Jika tenang setelah 5 detik, kembali ke NORMAL_CONVOY
+      if (now - lastAlertTime > 5) {
         systemStatus = "NORMAL_CONVOY";
         updateBanner();
       }
@@ -462,26 +183,16 @@
     function updateBanner() {
       const box = document.getElementById("status-box");
       box.className = "status-banner " + systemStatus;
-      let text = "";
-      if (systemStatus === "NORMAL_CONVOY") text = "🛡️ STATUS: NORMAL_CONVOY (Perjalanan Aman)";
-      else if (systemStatus === "BUMPY_ROAD") text = "⚠️ STATUS: BUMPY_ROAD (Polisi Tidur / Jalan Rusak)";
-      else if (systemStatus === "SOS_CRASH_ACTIVE") text = "🚨 STATUS: SOS_CRASH_ACTIVE (HP A Mengalami Benturan / Terjatuh!)";
-      else if (systemStatus === "RESCUE_DISPATCHED") text = "🚑 STATUS: RESCUE_DISPATCHED (Bantuan Dalam Perjalanan)";
-      else text = "STATUS: " + systemStatus;
-      box.innerHTML = `<span>${text}</span>`;
+      box.innerText = `STATUS KEPUTUSAN AI: ${systemStatus} (Update: ${new Date().toLocaleTimeString()})`;
     }
 
     function triggerRescue() {
       systemStatus = "RESCUE_DISPATCHED";
       lastAlertTime = Date.now() / 1000;
+      const isDark = stateA.lux < 50.0;
       updateBanner();
-      const isDark = (stateA.lux || 100) < 150;
-      addLog("🚑 Tombol Bantuan / Shake: Mengirim instruksi RESCUE ke HP A & B!", "log-rescue");
+      addLog("🚑 Mengirim sinyal RESCUE_ON_THE_WAY balik ke HP A (Nyalakan Senter SOS & TTS)!");
 
-      // Beri tahu Server AI
-      publishAll("dashboard/control", { command: "TRIGGER_RESCUE" });
-
-      // Direct fallback ke HP A & B
       publishAll("edge_a/command", {
         action: "RESCUE_ON_THE_WAY",
         is_dark: isDark
@@ -496,72 +207,8 @@
       systemStatus = "NORMAL_CONVOY";
       stateB.shake_ack = false;
       updateBanner();
-      addLog("🔄 Reset sistem: Kembali ke NORMAL_CONVOY");
-
-      publishAll("dashboard/control", { command: "RESET_SYSTEM" });
+      addLog("🔄 Status sistem di-reset ke NORMAL_CONVOY.");
     }
-
-    function simulateCrash() {
-      addLog("⚠️ Memulai simulasi benturan nyata (Impact 5.8 m/s², Miring 72.5°) pada HP A...", "log-alert");
-      publishAll("edge_a/telemetry", {
-        device: "HP_A",
-        impact: 5.8,
-        tilt_deg: 72.5,
-        gyro_rate: 3.2,
-        lux: 15.0,
-        timestamp: Math.floor(Date.now() / 1000)
-      });
-    }
-
-    function drawChart() {
-      const canvas = document.getElementById("chartCanvas");
-      const ctx = canvas.getContext("2d");
-      const w = canvas.width;
-      const h = canvas.height;
-
-      ctx.clearRect(0, 0, w, h);
-
-      ctx.strokeStyle = "#1e293b";
-      ctx.lineWidth = 1;
-      for (let y = 0; y < h; y += 35) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
-        ctx.stroke();
-      }
-
-      const maxVal = 8.0;
-
-      const threshY = h - (4.0 / maxVal) * (h - 20) - 10;
-      ctx.strokeStyle = "#eab308";
-      ctx.setLineDash([6, 4]);
-      ctx.beginPath();
-      ctx.moveTo(0, threshY);
-      ctx.lineTo(w, threshY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      drawLineSeries(ctx, historyA, "#38bdf8", w, h, maxVal);
-      drawLineSeries(ctx, historyB, "#f43f5e", w, h, maxVal);
-    }
-
-    function drawLineSeries(ctx, arr, color, w, h, maxVal) {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      const step = w / (MAX_POINTS - 1);
-
-      arr.forEach((val, i) => {
-        const x = i * step;
-        const clampedVal = Math.min(maxVal, Math.max(0, val));
-        const y = h - (clampedVal / maxVal) * (h - 20) - 10;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      });
-      ctx.stroke();
-    }
-
-    drawChart();
   </script>
 </body>
 </html>
